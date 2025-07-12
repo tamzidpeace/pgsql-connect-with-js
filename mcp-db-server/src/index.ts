@@ -3,16 +3,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { Client } from "pg";
 
-const client = new Client({
-  host: '127.0.0.1',       // or your DB host
-  port: 5432,              // default PostgreSQL port
-  user: 'sail',
-  password: 'secret',
-  database: 'inventory',
-});
-
 const server = new McpServer({
-  name: "Database Connector",
+  name: "db-connector",
   version: "1.0.0",
   capabilities: {
     resources: {},
@@ -24,6 +16,10 @@ const server = new McpServer({
             tableName: {
               type: "string",
               description: "The name of the database table to retrieve data from.",
+            },
+            databaseName: {
+              type: "string",
+              description: "The name of the database to connect to. Defaults to 'inventory'.",
             },
           },
           required: ["tableName"],
@@ -37,9 +33,17 @@ server.tool(
   "get-table-data",
   z.object({
     tableName: z.string().describe("The name of the database table to retrieve data from."),
+    databaseName: z.string().optional().describe("The name of the database to connect to. Defaults to 'inventory'."),
   }).shape,
-  async (args: { tableName: string }) => {
-    const { tableName } = args;
+  async ({ tableName, databaseName }) => {
+    const client = new Client({
+      host: '127.0.0.1',       // or your DB host
+      port: 5432,              // default PostgreSQL port
+      user: 'sail',
+      password: 'secret',
+      database: databaseName || 'inventory',
+    });
+
     try {
       await client.connect();
       const res = await client.query(`SELECT * FROM ${tableName}`);
@@ -63,3 +67,5 @@ main().catch((error) => {
   console.error("Fatal error in main():", error);
   process.exit(1);
 });
+
+    

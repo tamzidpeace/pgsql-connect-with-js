@@ -2,13 +2,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { Client } from "pg";
-const client = new Client({
-    host: '127.0.0.1', // or your DB host
-    port: 5432, // default PostgreSQL port
-    user: 'sail',
-    password: 'secret',
-    database: 'inventory',
-});
 const server = new McpServer({
     name: "db-connector",
     version: "1.0.0",
@@ -23,6 +16,10 @@ const server = new McpServer({
                             type: "string",
                             description: "The name of the database table to retrieve data from.",
                         },
+                        databaseName: {
+                            type: "string",
+                            description: "The name of the database to connect to. Defaults to 'inventory'.",
+                        },
                     },
                     required: ["tableName"],
                 },
@@ -32,8 +29,15 @@ const server = new McpServer({
 });
 server.tool("get-table-data", z.object({
     tableName: z.string().describe("The name of the database table to retrieve data from."),
-}).shape, async (args) => {
-    const { tableName } = args;
+    databaseName: z.string().optional().describe("The name of the database to connect to. Defaults to 'inventory'."),
+}).shape, async ({ tableName, databaseName }) => {
+    const client = new Client({
+        host: '127.0.0.1', // or your DB host
+        port: 5432, // default PostgreSQL port
+        user: 'sail',
+        password: 'secret',
+        database: databaseName || 'inventory',
+    });
     try {
         await client.connect();
         const res = await client.query(`SELECT * FROM ${tableName}`);
