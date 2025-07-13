@@ -2,9 +2,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { Client } from "pg";
+import format from 'pg-format';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 const server = new McpServer({
-  name: "db-connector",
+  name: "Database Connector",
   version: "1.0.0",
   capabilities: {
     resources: {},
@@ -36,17 +41,23 @@ server.tool(
     databaseName: z.string().optional().describe("The name of the database to connect to. Defaults to 'inventory'."),
   }).shape,
   async ({ tableName, databaseName }) => {
+    // Validate and sanitize table name to prevent SQL injection
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+    
     const client = new Client({
-      host: '127.0.0.1',       // or your DB host
-      port: 5432,              // default PostgreSQL port
-      user: 'sail',
-      password: 'secret',
-      database: databaseName || 'inventory',
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || '',
+      database: databaseName || process.env.DB_NAME || 'inventory',
     });
 
     try {
       await client.connect();
-      const res = await client.query(`SELECT * FROM ${tableName}`);
+      const query = format('SELECT * FROM %I', tableName); 
+      const res = await client.query(query);
       return { content: [{ type: "text", text: JSON.stringify(res.rows) }] };
     } catch (error: any) {
       console.error(`Error fetching data from table ${tableName}:`, error.stack);
