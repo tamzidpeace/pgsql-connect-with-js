@@ -13,12 +13,16 @@
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "dotenv": "^16.6.1",
     "pg": "^8.11.3",
+    "pg-format": "^1.0.4",
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/dotenv": "^8.2.3",
     "@types/node": "^20.11.5",
     "@types/pg": "^8.11.0",
+    "@types/pg-format": "^1.0.5",
     "typescript": "^5.3.3"
   }
 }
