@@ -46,6 +46,27 @@ const server = new McpServer({
           required: ["query"],
         },
       },
+      "insert-table-data": {
+        input_schema: {
+          type: "object",
+          properties: {
+            tableName: {
+              type: "string",
+              description: "The name of the database table to insert data into.",
+            },
+            data: {
+              type: "object",
+              description: "The data to insert, where keys are column names and values are the data.",
+              additionalProperties: true,
+            },
+            databaseName: {
+              type: "string",
+              description: "The name of the database to connect to. Defaults to 'inventory'.",
+            },
+          },
+          required: ["tableName", "data"],
+        },
+      },
     },
   },
 });
@@ -106,6 +127,43 @@ server.tool(
     } catch (error: any) {
       console.error(`Error executing custom query: ${query}`, error.stack);
       throw new Error(`Failed to execute custom query: ${error.message}`);
+    } finally {
+      await client.end();
+    }
+  }
+);
+
+server.tool(
+  "insert-table-data",
+  z.object({
+    tableName: z.string().describe("The name of the database table to insert data into."),
+    data: z.record(z.any()).describe("The data to insert, where keys are column names and values are the data."),
+    databaseName: z.string().optional().describe("The name of the database to connect to. Defaults to 'inventory'."),
+  }).shape,
+  async ({ tableName, data, databaseName }) => {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tableName)) {
+      throw new Error(`Invalid table name: ${tableName}`);
+    }
+
+    const columns = Object.keys(data);
+    const values = Object.values(data);
+
+    const client = new Client({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || '',
+      database: databaseName || process.env.DB_NAME || 'inventory',
+    });
+
+    try {
+      await client.connect();
+      const query = format('INSERT INTO %I (%I) VALUES (%L) RETURNING *;', tableName, columns, values);
+      const res = await client.query(query);
+      return { content: [{ type: "text", text: JSON.stringify(res.rows[0]) }] };
+    } catch (error: any) {
+      console.error(`Error inserting data into table ${tableName}:`, error.stack);
+      throw new Error(`Failed to insert data into table ${tableName}: ${error.message}`);
     } finally {
       await client.end();
     }
