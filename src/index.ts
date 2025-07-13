@@ -30,6 +30,22 @@ const server = new McpServer({
           required: ["tableName"],
         },
       },
+      "execute-custom-query": {
+        input_schema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "The SQL query to execute.",
+            },
+            databaseName: {
+              type: "string",
+              description: "The name of the database to connect to. Defaults to 'inventory'.",
+            },
+          },
+          required: ["query"],
+        },
+      },
     },
   },
 });
@@ -62,6 +78,34 @@ server.tool(
     } catch (error: any) {
       console.error(`Error fetching data from table ${tableName}:`, error.stack);
       throw new Error(`Failed to retrieve data from table ${tableName}: ${error.message}`);
+    } finally {
+      await client.end();
+    }
+  }
+);
+
+server.tool(
+  "execute-custom-query",
+  z.object({
+    query: z.string().describe("The SQL query to execute."),
+    databaseName: z.string().optional().describe("The name of the database to connect to. Defaults to 'inventory'."),
+  }).shape,
+  async ({ query, databaseName }) => {
+    const client = new Client({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      user: process.env.DB_USER || 'postgres',
+      password: process.env.DB_PASSWORD || '',
+      database: databaseName || process.env.DB_NAME || 'inventory',
+    });
+
+    try {
+      await client.connect();
+      const res = await client.query(query);
+      return { content: [{ type: "text", text: JSON.stringify(res.rows) }] };
+    } catch (error: any) {
+      console.error(`Error executing custom query: ${query}`, error.stack);
+      throw new Error(`Failed to execute custom query: ${error.message}`);
     } finally {
       await client.end();
     }
